@@ -1,16 +1,19 @@
 package org.example.restapipractice.Service;
 
+import org.example.restapipractice.DTO.CreateTaskRequest;
+import org.example.restapipractice.DTO.TaskResponse;
+import org.example.restapipractice.DTO.UpdateTaskRequest;
 import org.example.restapipractice.Entity.Task;
 import org.example.restapipractice.Entity.User;
 import org.example.restapipractice.Repository.TaskRepository;
 import org.example.restapipractice.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
@@ -27,17 +30,39 @@ public class TaskService {
 
 
     public List<Task> getAllTasks() {
-        return taskRepository.findAll();
+
+
+        return taskRepository.findAll().stream()
+                .collect(Collectors.toList());
     }
 
-    public Optional<Task> getTaskById (Long id) {
-        return taskRepository.findById(id);
+    // For a GET request, client does NOT usually send a request DTO
+    public TaskResponse getTaskById (Long id) {
+        Task task = taskRepository.findById(id)
+                .orElseThrow();
+
+
+
+        return new TaskResponse(task.getName(),
+                task.getDescription(), task.getDueDate(),
+                task.isCompleted(), task.getId());
     }
 
 
-    public Task createTask(@RequestBody Task task) {
-        task.setCreatedAt(LocalDateTime.now());
-       return taskRepository.save(task);
+    public TaskResponse createTask(CreateTaskRequest taskRequest) {
+       User user = userRepository.findById(taskRequest.userId())
+               .orElseThrow();
+       Task task = new Task();
+       task.setName(taskRequest.name());
+       task.setDescription(taskRequest.description());
+       task.setDueDate(taskRequest.dueDate());
+       task.setCompleted(false);
+       task.setUser(user);
+
+       Task taskSaved = taskRepository.save(task);
+       return new TaskResponse(taskSaved.getName(), taskSaved.getDescription(),
+               taskSaved.getDueDate(), taskSaved.isCompleted(),
+               taskSaved.getUser().getId());
     }
 
     public List<Task> findAllByUser(User user) {
@@ -60,8 +85,20 @@ public class TaskService {
             System.out.println("Cannot find user");
         task.setCompleted(false);
         task.setCreatedAt(LocalDateTime.now());
-        
+
 
         return taskRepository.save(task);
+    }
+
+    public TaskResponse updateTask(UpdateTaskRequest updateTaskRequest, Long userId) {
+        Task task = taskRepository.findTaskByUser(userId);
+        task.setDueDate(updateTaskRequest.dueDate());
+        task.setName(updateTaskRequest.name());
+        task.setDescription(updateTaskRequest.description());
+        task.setCompleted(updateTaskRequest.completed());
+        taskRepository.save(task);
+        return new TaskResponse(task.getName(), task.getDescription(),
+                task.getDueDate(), task.isCompleted(), task.getId());
+
     }
 }
